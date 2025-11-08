@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import {
   TrendingUp,
-  TrendingDown,
   Loader2,
   BarChart3,
   Sparkles,
@@ -11,6 +10,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Search,
+  Globe2,
+  Truck,
 } from "lucide-react";
 import {
   LineChart,
@@ -35,8 +36,20 @@ export default function Terminal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // 🧮 Trade Simulation States
+  const [tradeParams, setTradeParams] = useState({
+    commodity: "Wheat",
+    source: "Mumbai Port",
+    destination: "Novorossiysk",
+    qty_tonnes: 20,
+    domestic: false,
+  });
+  const [tradeResult, setTradeResult] = useState(null);
+  const [tradeLoading, setTradeLoading] = useState(false);
+
+  // Fetch terminal analytics
   const fetchData = async (
-    commodityName,
+    commodityName = commodity,
     harvest_days = harvestDays,
     location = city
   ) => {
@@ -63,8 +76,7 @@ export default function Terminal() {
   };
 
   useEffect(() => {
-    fetchData(commodity, harvestDays, city);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchData();
   }, []);
 
   const handleSearch = (e) => {
@@ -86,6 +98,75 @@ export default function Terminal() {
     fetchData(commodity, harvestDays, city);
   };
 
+  // 🚚 Trade Simulation Logic
+  const handleTradeSimulation = async () => {
+    setTradeLoading(true);
+    setTradeResult(null);
+    try {
+      const { commodity, source, destination, qty_tonnes, domestic } =
+        tradeParams;
+      const res = await api.get(
+        `/terminal/simulate-trade?commodity=${encodeURIComponent(
+          commodity
+        )}&source=${encodeURIComponent(
+          source
+        )}&destination=${encodeURIComponent(
+          destination
+        )}&qty_tonnes=${qty_tonnes}&domestic=${domestic}`
+      );
+      setTradeResult(res.data);
+    } catch (err) {
+      console.error("Trade Simulation Error:", err);
+      setTradeResult({
+        error:
+          err?.response?.data?.detail ||
+          err.message ||
+          "Simulation failed, please try again.",
+      });
+    } finally {
+      setTradeLoading(false);
+    }
+  };
+
+  // 🌍 Load international options dynamically
+  const [internationalOptions, setInternationalOptions] = useState({
+    commodities: [],
+    ports: [],
+  });
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const res = await api.get("/terminal/international-options");
+        setInternationalOptions(res.data);
+      } catch (err) {
+        console.error("Failed to load international options:", err);
+      }
+    };
+    fetchOptions();
+  }, []);
+
+  // 🌍 Auto-suggest destination port when source selected
+  useEffect(() => {
+    if (
+      tradeParams.source &&
+      internationalOptions.ports.length > 1 &&
+      !tradeParams.destination
+    ) {
+      const otherPorts = internationalOptions.ports.filter(
+        (p) => p !== tradeParams.source
+      );
+      if (otherPorts.length > 0) {
+        setTradeParams((prev) => ({
+          ...prev,
+          destination:
+            otherPorts[Math.floor(Math.random() * otherPorts.length)],
+        }));
+      }
+    }
+  }, [tradeParams.source, internationalOptions]);
+
+  // Load + Error states
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -114,6 +195,7 @@ export default function Terminal() {
 
   if (!data) return null;
 
+  // 🧠 Extract API Data
   const {
     summary,
     market_data,
@@ -128,18 +210,14 @@ export default function Terminal() {
     location,
   } = data;
 
-  // fallback arrays
   const sellHigh = (optimal_market?.sell_high || []).slice(0, 6);
   const buyLow = (optimal_market?.buy_low || []).slice(0, 6);
-
   const recAction = (recommendation?.action || "HOLD").toUpperCase();
   const recConfidence = recommendation?.confidence ?? 72;
   const recReason =
     recommendation?.reason || ai_reason || ai_summary || "No reason provided.";
 
-  const recColor =
-    recAction === "BUY" ? "emerald" : recAction === "SELL" ? "rose" : "amber";
-
+  // 🌾 Render
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
@@ -159,7 +237,8 @@ export default function Terminal() {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 justify-end">
+          {/* Commodity */}
           <form
             onSubmit={handleSearch}
             className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2"
@@ -180,6 +259,7 @@ export default function Terminal() {
             </button>
           </form>
 
+          {/* City */}
           <form
             onSubmit={handleCitySubmit}
             className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2"
@@ -199,8 +279,9 @@ export default function Terminal() {
             </button>
           </form>
 
+          {/* Harvest */}
           <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-xl">
-            <div className="text-sm text-slate-400 mr-3">Harvest ready in</div>
+            <div className="text-sm text-slate-400 mr-3">Harvest in</div>
             <input
               type="range"
               min={0}
@@ -262,12 +343,7 @@ export default function Terminal() {
               value={recConfidence}
               text={`${recConfidence}%`}
               styles={buildStyles({
-                textColor:
-                  recAction === "BUY"
-                    ? "#22c55e"
-                    : recAction === "SELL"
-                    ? "#ef4444"
-                    : "#f59e0b",
+                textColor: "#fff",
                 pathColor:
                   recAction === "BUY"
                     ? "#22c55e"
@@ -278,16 +354,11 @@ export default function Terminal() {
               })}
             />
           </div>
-
-          <div className="text-right">
-            <div className="text-xs text-slate-400">Confidence</div>
-            <div className="text-slate-200 font-semibold">{recConfidence}%</div>
-          </div>
         </div>
       </motion.div>
 
+      {/* Yield + Price Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Yield Outlook */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles size={18} className="text-emerald-400" />
@@ -309,7 +380,6 @@ export default function Terminal() {
           </div>
         </div>
 
-        {/* Price Forecast chart */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -322,9 +392,19 @@ export default function Terminal() {
               {price_forecast_comment || "Model: simple trend"}
             </div>
           </div>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer>
-              <LineChart data={price_forecast}>
+          <div
+            className="w-full"
+            style={{
+              minWidth: "300px",
+              minHeight: "260px",
+              height: "260px",
+            }}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={price_forecast}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
                 <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
                 <XAxis dataKey="date" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" />
@@ -347,8 +427,8 @@ export default function Terminal() {
         </div>
       </div>
 
+      {/* Market Sentiment + Optimal Markets */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Market Sentiment */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={18} className="text-sky-400" />
@@ -369,7 +449,6 @@ export default function Terminal() {
           </div>
         </div>
 
-        {/* Optimal Market - Sell High */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-3">
             <ArrowUpRight size={18} className="text-emerald-400" />
@@ -378,9 +457,6 @@ export default function Terminal() {
             </h4>
           </div>
           <div className="space-y-2">
-            {sellHigh.length === 0 && (
-              <div className="text-slate-400 text-sm">No data</div>
-            )}
             {sellHigh.map((m, i) => (
               <div
                 key={i}
@@ -399,7 +475,6 @@ export default function Terminal() {
           </div>
         </div>
 
-        {/* Optimal Market - Buy Low */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-3">
             <ArrowDownRight size={18} className="text-rose-400" />
@@ -408,9 +483,6 @@ export default function Terminal() {
             </h4>
           </div>
           <div className="space-y-2">
-            {buyLow.length === 0 && (
-              <div className="text-slate-400 text-sm">No data</div>
-            )}
             {buyLow.map((m, i) => (
               <div
                 key={i}
@@ -430,7 +502,7 @@ export default function Terminal() {
         </div>
       </div>
 
-      {/* Markets sample table */}
+      {/* Market Data Table */}
       <div className="mt-6 bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-md font-semibold text-slate-200">
@@ -463,6 +535,159 @@ export default function Terminal() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* 🌍 Trade Simulation Section */}
+      <div className="mt-12 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <Truck size={22} className="text-emerald-400" />
+          <h2 className="text-2xl font-semibold text-slate-100">
+            P2P Trade Simulation
+          </h2>
+        </div>
+
+        {/* Trade Inputs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <input
+            type="text"
+            value={tradeParams.commodity}
+            onChange={(e) =>
+              setTradeParams({ ...tradeParams, commodity: e.target.value })
+            }
+            placeholder="Commodity (e.g. Wheat)"
+            className="px-4 py-2 bg-slate-900/60 border border-slate-700/50 rounded-lg text-slate-200"
+          />
+          <input
+            type="text"
+            value={tradeParams.source}
+            onChange={(e) =>
+              setTradeParams({ ...tradeParams, source: e.target.value })
+            }
+            placeholder="Source Port / Market"
+            className="px-4 py-2 bg-slate-900/60 border border-slate-700/50 rounded-lg text-slate-200"
+          />
+          <input
+            type="text"
+            value={tradeParams.destination}
+            onChange={(e) =>
+              setTradeParams({ ...tradeParams, destination: e.target.value })
+            }
+            placeholder="Destination Port / Market"
+            className="px-4 py-2 bg-slate-900/60 border border-slate-700/50 rounded-lg text-slate-200"
+          />
+          <input
+            type="number"
+            value={tradeParams.qty_tonnes}
+            onChange={(e) =>
+              setTradeParams({ ...tradeParams, qty_tonnes: e.target.value })
+            }
+            placeholder="Qty (tonnes)"
+            className="px-4 py-2 bg-slate-900/60 border border-slate-700/50 rounded-lg text-slate-200"
+          />
+        </div>
+
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <label className="flex items-center gap-2 text-slate-300 text-sm">
+            <input
+              type="checkbox"
+              checked={tradeParams.domestic}
+              onChange={(e) =>
+                setTradeParams({ ...tradeParams, domestic: e.target.checked })
+              }
+            />
+            Domestic Trade (India)
+          </label>
+          <button
+            onClick={handleTradeSimulation}
+            disabled={tradeLoading}
+            className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition"
+          >
+            {tradeLoading ? (
+              <Loader2 size={18} className="animate-spin inline mr-2" />
+            ) : (
+              <Globe2 size={18} className="inline mr-2" />
+            )}
+            Simulate Trade
+          </button>
+        </div>
+
+        {/* Trade Result */}
+        {tradeResult && (
+          <div
+            className={`rounded-xl p-6 border ${
+              tradeResult.error
+                ? "border-rose-500/40 bg-rose-500/10"
+                : tradeResult.profitable
+                ? "border-emerald-500/40 bg-emerald-500/10"
+                : "border-amber-500/40 bg-amber-500/10"
+            }`}
+          >
+            {tradeResult.error ? (
+              <div className="text-rose-300">{tradeResult.error}</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-slate-200">
+                <div>
+                  <h4 className="text-sm text-slate-400">Commodity</h4>
+                  <p className="text-lg font-semibold">
+                    {tradeResult.commodity}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Mode</h4>
+                  <p className="text-lg font-semibold">{tradeResult.mode}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Distance (km)</h4>
+                  <p className="text-lg font-semibold">
+                    {tradeResult.distance_km}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Buy Price (₹/t)</h4>
+                  <p className="text-lg font-semibold">
+                    ₹{tradeResult.buy_price_inr_per_tonne}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Sell Price (₹/t)</h4>
+                  <p className="text-lg font-semibold">
+                    ₹{tradeResult.sell_price_inr_per_tonne}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Logistics Cost</h4>
+                  <p className="text-lg font-semibold">
+                    ₹{tradeResult.logistics_cost_inr}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Net Profit</h4>
+                  <p
+                    className={`text-lg font-semibold ${
+                      tradeResult.net_profit_inr > 0
+                        ? "text-emerald-400"
+                        : "text-rose-400"
+                    }`}
+                  >
+                    ₹{tradeResult.net_profit_inr}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">ROI</h4>
+                  <p className="text-lg font-semibold">
+                    {tradeResult.roi_percent}%
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Quantity</h4>
+                  <p className="text-lg font-semibold">
+                    {tradeResult.qty_tonnes} t
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../api/axios";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import CropCard from "../components/CropCard";
 import {
   CloudSun,
@@ -29,10 +31,9 @@ import {
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [city, setCity] = useState("Bhopal");
-  const [inputCity, setInputCity] = useState("Bhopal");
+  const [city, setCity] = useState("Indore");
+  const [inputCity, setInputCity] = useState("Indore");
 
-  // Fetch dashboard data
   const fetchDashboard = async (location) => {
     setLoading(true);
     try {
@@ -75,98 +76,123 @@ export default function Dashboard() {
   const current = data?.weather?.current || {};
   const forecast = data?.weather?.forecast || [];
   const astro = data?.weather?.astro || {};
-  const aiSummary = data?.ai_summary || "";
-  const marketData = data?.market_prices || [];
+  const aiSummary = data?.ai_summary || "AI summary not available.";
+  const aiCropInsights = data?.ai_crop_insights || [];
+  const marketData = data?.market_data || [];
   const news = data?.news || [];
 
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-linear-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/25">
-              <CloudSun size={24} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-100">
-                AgriPulse Dashboard
-              </h1>
-              <p className="text-slate-400 text-sm">
-                Real-time agriculture insights for{" "}
-                <span className="text-sky-400">{city}</span>
-              </p>
-            </div>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-linear-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/25">
+            <CloudSun size={24} className="text-white" />
           </div>
-
-          {/* City Selector */}
-          <form
-            onSubmit={handleCitySubmit}
-            className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2 focus-within:border-sky-500/50 transition-all duration-300"
-          >
-            <MapPin size={18} className="text-sky-400" />
-            <input
-              type="text"
-              placeholder="Enter city (e.g. Delhi)"
-              value={inputCity}
-              onChange={(e) => setInputCity(e.target.value)}
-              className="bg-transparent text-slate-200 placeholder-slate-500 outline-none w-40 sm:w-56"
-            />
-            <button
-              type="submit"
-              className="bg-sky-500/20 hover:bg-sky-600/30 border border-sky-500/30 rounded-lg p-2 transition-all duration-300"
-              title="Search"
-            >
-              <Search size={16} className="text-sky-400" />
-            </button>
-          </form>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-100">
+              AgriPulse Dashboard
+            </h1>
+            <p className="text-slate-400 text-sm">
+              Real-time agriculture insights for{" "}
+              <span className="text-sky-400">{city}</span>
+            </p>
+          </div>
         </div>
+
+        {/* City Search */}
+        <form
+          onSubmit={handleCitySubmit}
+          className="flex items-center gap-2 bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2 focus-within:border-sky-500/50 transition-all duration-300"
+        >
+          <MapPin size={18} className="text-sky-400" />
+          <input
+            type="text"
+            placeholder="Enter city (e.g. Delhi)"
+            value={inputCity}
+            onChange={(e) => setInputCity(e.target.value)}
+            className="bg-transparent text-slate-200 placeholder-slate-500 outline-none w-40 sm:w-56"
+          />
+          <button
+            type="submit"
+            className="bg-sky-500/20 hover:bg-sky-600/30 border border-sky-500/30 rounded-lg p-2 transition-all duration-300"
+            title="Search"
+          >
+            <Search size={16} className="text-sky-400" />
+          </button>
+        </form>
       </div>
 
-      {/* AI Summary */}
-      <div className="mb-6 bg-linear-to-br from-sky-500/10 to-blue-600/10 backdrop-blur-sm border border-sky-500/20 rounded-2xl p-6 hover:border-sky-500/30 transition-all duration-300">
+      {/* AI Advisory Summary */}
+      <div className="mb-6 bg-linear-to-br from-sky-500/10 to-blue-600/10 border border-sky-500/20 rounded-2xl p-6 backdrop-blur-sm hover:border-sky-500/30 transition-all duration-300">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-linear-to-br from-sky-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-sky-500/25">
             <Sparkles size={20} className="text-white" />
           </div>
           <div className="flex-1">
             <p className="text-sm text-slate-400 mb-2">AI Advisory Summary</p>
-            <p className="text-slate-200 leading-relaxed whitespace-pre-line">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => (
+                  <p className="mb-2 text-slate-200">{children}</p>
+                ),
+                strong: ({ children }) => (
+                  <strong className="text-sky-400">{children}</strong>
+                ),
+                ul: ({ children }) => (
+                  <ul className="list-disc list-inside text-slate-300 space-y-1">
+                    {children}
+                  </ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal list-inside text-slate-300 space-y-1">
+                    {children}
+                  </ol>
+                ),
+                li: ({ children }) => (
+                  <li className="text-slate-400">{children}</li>
+                ),
+              }}
+            >
               {aiSummary}
-            </p>
+            </ReactMarkdown>
           </div>
         </div>
       </div>
 
-      {/* 🌾 AI Recommendations Panel */}
-      {Array.isArray(data.ai_crop_insights) &&
-        data.ai_crop_insights.length > 0 && (
-          <div className="mt-10 bg-linear-to-br from-emerald-500/10 to-teal-600/10 border border-emerald-500/20 rounded-2xl p-8 backdrop-blur-sm hover:border-emerald-500/40 transition-all duration-300">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-linear-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                <Sparkles size={20} className="text-white" />
-              </div>
-              <h2 className="text-2xl font-semibold text-slate-100">
-                AI Crop Recommendations
-              </h2>
+      {/* Crop Recommendations */}
+      {Array.isArray(aiCropInsights) && aiCropInsights.length > 0 && (
+        <div className="mt-10 bg-linear-to-br from-emerald-500/10 to-teal-600/10 border border-emerald-500/20 rounded-2xl p-8 backdrop-blur-sm hover:border-emerald-500/40 transition-all duration-300">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-linear-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/25">
+              <Sparkles size={20} className="text-white" />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {data.ai_crop_insights.map((item, idx) => (
-                <CropCard
-                  key={idx}
-                  crop={item.crop}
-                  confidence={item.confidence}
-                  reason={item.reason}
-                />
-              ))}
-            </div>
+            <h2 className="text-2xl font-semibold text-slate-100">
+              AI Crop Recommendations
+            </h2>
           </div>
-        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Weather Section */}
-        <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {aiCropInsights.map((item, idx) => (
+              <CropCard
+                key={idx}
+                crop={item.crop}
+                confidence={item.confidence}
+                reason={
+                  Array.isArray(item.reason)
+                    ? item.reason.join("\n")
+                    : item.reason
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 mt-8">
+        {/* Weather */}
+        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm hover:border-slate-600/50 transition-all duration-300">
           <div className="flex items-center gap-2 mb-6">
             <CloudSun size={20} className="text-sky-400" />
             <h2 className="text-lg font-semibold text-slate-200">
@@ -174,7 +200,7 @@ export default function Dashboard() {
             </h2>
           </div>
 
-          {/* Current Conditions */}
+          {/* Main Weather */}
           <div className="bg-linear-to-br from-sky-500/10 to-blue-600/10 rounded-xl p-5 border border-sky-500/20 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -204,7 +230,6 @@ export default function Dashboard() {
                 <p className="text-sm text-slate-400">Humidity</p>
               </div>
             </div>
-
             <div className="flex items-center justify-between mt-4 text-slate-400 text-sm">
               <div className="flex items-center gap-1">
                 <Wind size={16} />
@@ -221,7 +246,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Forecast Carousel */}
+          {/* Forecast */}
           <div className="relative overflow-x-auto">
             <div className="flex gap-4 min-w-max pb-2">
               {forecast.map((day, idx) => (
@@ -257,8 +282,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Market Prices Section */}
-        <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+        {/* Market Prices */}
+        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={20} className="text-emerald-400" />
             <h2 className="text-lg font-semibold text-slate-200">
@@ -274,7 +299,7 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={marketData.slice(0, 8)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="market" stroke="#94a3b8" />
+                <XAxis dataKey="commodity" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" />
                 <Tooltip
                   contentStyle={{
@@ -293,23 +318,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* AI Insight Card */}
-      <div className="bg-linear-to-br from-emerald-500/10 to-teal-600/10 backdrop-blur-sm border border-emerald-500/20 rounded-2xl p-6 hover:border-emerald-500/40 transition-all duration-300 mb-6">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-linear-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/25">
-            <Sparkles size={20} className="text-white" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm text-emerald-400 mb-2">AI Crop Insight</p>
-            <p className="text-slate-200 leading-relaxed whitespace-pre-line">
-              {data.ai_crop_insight || "AI insight not available right now."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* News Section */}
-      <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all duration-300">
+      {/* Agriculture News */}
+      <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm hover:border-slate-600/50 transition-all duration-300">
         <div className="flex items-center gap-2 mb-6">
           <Newspaper size={20} className="text-violet-400" />
           <h2 className="text-lg font-semibold text-slate-200">
